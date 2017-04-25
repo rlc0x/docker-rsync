@@ -1,5 +1,5 @@
 FROM centos:centos6
-MAINTAINER Raymond Cox rcox@unixandmore.com
+MAINTAINER Raymond Cox rcox@lunartix.com
 
 RUN yum -y update && yum -y install \
     authconfig \
