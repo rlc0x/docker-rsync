@@ -81,13 +81,29 @@ mount_dirs() {
     fi
 }
 
+usage() {
+  echo "";
+  echo "Usage: entrypoint.sh SYSNAME:FS:[SLEEP]";
+  echo "SYSNAME = Name used to identify the collection of mounts being moved.";
+  echo "FS = An identifier used to select the mount being moved eg: sys1p_data";
+  echo "SLEEP = number of minutes to sleep between runs.";
+  echo " If the SLEEP value is not provided it defaults to 0 (single run)";
+  echo " Any positive value will result in the rsync process syncing data in a loop, sleeping ${SLEEP} minutes between runs.";
+  echo "";
+  exit 1;
+
+}
+
 d="${@}"
 for data in "${d[@]}"; do
     SYSNAME=$(echo $data | awk -F':' '{ print $1}')
     FS=$(echo $data | awk -F':' '{ print $2}')
     SLEEP=$(echo $data | awk -F':' '{ print $3 }')
     SYSNAME_JSON="/tmp/${SYSNAME}.json"
+    [[ -z "${SYSNAME}" ]] &&  usage
+    [[ -z "${FS}" ]] && usage
     [[ -z "${SLEEP}" ]] && SLEEP=0
+    
 done
 
 case ${SYSNAME} in 
@@ -111,8 +127,16 @@ case ${SYSNAME} in
         if [ -f ${SYSNAME_JSON} ]; then
             JQ=$(<${SYSNAME_JSON})
         else
-            err "Unable to find the JSON data file ${SYSNAME_JSON}"
-            exit 2
+            usage
+        fi
+
+        # The jq command returns a string literal called null.
+        # Check to make sure there is a valid fs identifier before trying to mount anything.
+        # Bail noisily if nothing exists.
+        FSTEST=$(echo ${JQ} | jq -r .mounts.${FS})
+        if [ "${FSTEST}" == "null" ]; then
+	    echo "The File system identifier ${FS} is not a valid option, bailing" 
+            exit 1
         fi
         OLDNAS=$(echo ${JQ} | jq -r .nas.old.name)
         OLDREMOTE=$(echo ${JQ} | jq -r .mounts.${FS}.old.remote)
